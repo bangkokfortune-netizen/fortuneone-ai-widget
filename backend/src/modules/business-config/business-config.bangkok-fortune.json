@@ -1,0 +1,24 @@
+{
+  "business_id": "bangkok-fortune",
+  "name": "Bangkok Fortune Thai Massage & Waxing Spa",
+  "language_default": "en",
+  "language_supported": ["en", "th"],
+  "location": "Midtown Manhattan",
+  "address": "123 Midtown St, New York, NY 10001",
+  "phone": "+1 (212) 555-1234",
+  "opening_hours": "09:00–23:00",
+  "base_price": {
+    "massage_hr": 150
+  },
+  "services": [
+    { "id": "thai", "name": "Thai Massage" },
+    { "id": "deeptissue", "name": "Deep Tissue Massage" }
+  ],
+  "booking_link": "https://square-link.com/bangkok-fortune",
+  "promotions": [
+    {
+      "name": "Winter Special",
+      "details": "10% off any 90-minute service (Mon–Thu)"
+    }
+  ]
+}
