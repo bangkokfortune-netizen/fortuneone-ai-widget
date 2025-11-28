@@ -2,7 +2,7 @@ import Fastify from "fastify";
 import fastifyWebsocket from "@fastify/websocket";
 import fastifyCors from "@fastify/cors";
 import { APP_CONFIG } from "./core/config";
-import { WebSocketInboundMessage, WebSocketOutboundMessage } from "./core/types";
+import { WebSocketInboundMessage, WebSocketOutboundMessage, ClientTextInputMessage } from "./core/types";
 import { handleClientTextMessage } from "./modules/chat/chat.service";
 import { loadBusinessConfig } from "./modules/business-config/business-config.service";
 
@@ -60,9 +60,11 @@ fastify.register(async function (fastify) {
         fastify.log.info(`Received message: ${JSON.stringify(message)}`);
 
         if (message.type === "text_input") {
-          // Create ClientTextInputMessage object
-          const clientMsg = {
-            type: "text_input" as const,
+          // Create full ClientTextInputMessage object with all required fields
+          const clientMsg: ClientTextInputMessage = {
+            type: "text_input",
+            business_id: businessId,
+            session_id: sessionId,
             content: message.content,
             language: message.language || "en",
           };
