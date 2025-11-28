@@ -4,7 +4,7 @@ import fastifyCors from "@fastify/cors";
 import { APP_CONFIG } from "./core/config";
 import { WebSocketInboundMessage, WebSocketOutboundMessage } from "./core/types";
 import { handleClientTextMessage } from "./modules/chat/chat.service";
-import { getBusinessConfig } from "./modules/business-config/business-config.service";
+import { loadBusinessConfig } from "./modules/business-config/business-config.service";
 
 const fastify = Fastify({
   logger: true,
@@ -32,7 +32,7 @@ fastify.register(async function (fastify) {
     fastify.log.info(`WebSocket connected: businessId=${businessId}, sessionId=${sessionId}`);
 
     // Load business config
-    const businessConfig = getBusinessConfig(businessId);
+    const businessConfig = loadBusinessConfig(businessId);
     if (!businessConfig) {
       const errorMsg: WebSocketOutboundMessage = {
         type: "text_output",
@@ -54,38 +54,34 @@ fastify.register(async function (fastify) {
     socket.send(JSON.stringify(welcomeMsg));
 
     // Handle incoming messages
-    socket.on("message", async (rawData) => {
+    socket.on("message", async (rawData: Buffer) => {
       try {
         const message: WebSocketInboundMessage = JSON.parse(rawData.toString());
         fastify.log.info(`Received message: ${JSON.stringify(message)}`);
 
         if (message.type === "text_input") {
-          const response = await handleClientTextMessage({
-            business_id: businessId,
-            session_id: sessionId,
-            content: message.content,
-            language: message.language,
-          });
+          const response = await handleClientTextMessage(
+            message.content,
+            businessConfig,
+            message.language || "en"
+          );
           socket.send(JSON.stringify(response));
         }
-      } catch (error) {
-        fastify.log.error(`Error processing message: ${error}`);
-        const errorMsg: WebSocketOutboundMessage = {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        fastify.log.error(`Error processing message: ${errorMessage}`);
+        const errorResponse: WebSocketOutboundMessage = {
           type: "text_output",
-          content: "Sorry, I encountered an error. Please try again.",
+          content: "Sorry, I encountered an error processing your message.",
           language: "en",
           error: "PROCESSING_ERROR",
         };
-        socket.send(JSON.stringify(errorMsg));
+        socket.send(JSON.stringify(errorResponse));
       }
     });
 
     socket.on("close", () => {
       fastify.log.info(`WebSocket disconnected: sessionId=${sessionId}`);
-    });
-
-    socket.on("error", (error) => {
-      fastify.log.error(`WebSocket error: ${error}`);
     });
   });
 });
@@ -93,7 +89,7 @@ fastify.register(async function (fastify) {
 // Start server
 const start = async () => {
   try {
-    const port = APP_CONFIG.port;
+    const port = parseInt(process.env.PORT || "3000", 10);
     await fastify.listen({ port, host: "0.0.0.0" });
     fastify.log.info(`Server listening on port ${port}`);
   } catch (err) {
