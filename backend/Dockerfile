@@ -17,6 +17,9 @@ COPY src ./src
 # Build TypeScript to JavaScript
 RUN npm run build
 
+# Copy JSON config files to dist
+RUN cp -r src/modules/business-config/*.json dist/modules/business-config/ 2>/dev/null || mkdir -p dist/modules/business-config && cp src/modules/business-config/*.json dist/modules/business-config/
+
 # Remove dev dependencies for smaller image
 RUN npm prune --production
 
