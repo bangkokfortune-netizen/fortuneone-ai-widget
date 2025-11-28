@@ -1,6 +1,6 @@
 import fetch from "node-fetch";
 import { APP_CONFIG } from "../../core/config";
-import { IntentResult } from "../../core/types";
+import { IntentResult, BusinessConfig } from "../../core/types";
 
 /**
  * Square Service - Handles Square API integration
@@ -13,7 +13,8 @@ interface SquareSlot {
 }
 
 export async function handleSquareIntent(
-  intent: IntentResult
+  intent: IntentResult,
+  cfg: BusinessConfig
 ): Promise<{ slots?: SquareSlot[]; booking_confirmation?: { booking_id: string; time: string; service_name: string } }> {
   const { squareAccessToken, squareLocationId } = APP_CONFIG;
 
@@ -38,9 +39,9 @@ async function checkAvailability(
   // Placeholder - In production, call Square Bookings API
   // GET /v2/bookings/availability/search
   const { squareAccessToken, squareLocationId } = APP_CONFIG;
-  
+
   console.log(`[Square] Checking availability for ${intent.service_name} on ${intent.preferred_date}`);
-  
+
   // Mock response - replace with actual Square API call
   const mockSlots: SquareSlot[] = [
     { time: "10:00 AM", bookable: true },
@@ -59,15 +60,17 @@ async function bookAppointment(
   // Placeholder - In production, call Square Bookings API
   // POST /v2/bookings
   const { squareAccessToken, squareLocationId } = APP_CONFIG;
-  
-  console.log(`[Square] Booking ${intent.service_name} at ${intent.preferred_time_range}`);
-  
-  // Mock response - replace with actual Square API call
-  const mockBooking = {
-    booking_id: `BK-${Date.now()}`,
-    time: intent.preferred_time_range || "10:00 AM",
-    service_name: intent.service_name || "Thai Massage",
-  };
 
-  return { booking_confirmation: mockBooking };
+  console.log(`[Square] Booking appointment for ${intent.service_name} at ${intent.preferred_time_range}`);
+
+  // Mock response - replace with actual Square API call
+  const mockBookingId = `BK-${Date.now()}`;
+  
+  return {
+    booking_confirmation: {
+      booking_id: mockBookingId,
+      time: intent.preferred_time_range || "2:00 PM",
+      service_name: intent.service_name || "Thai Massage",
+    },
+  };
 }
