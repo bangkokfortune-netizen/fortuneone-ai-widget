@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FortuneOne AI Chat Widget Demo</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 40px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .demo-container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 { color: #333; margin-bottom: 10px; }
+    p { color: #666; line-height: 1.6; }
+    .instructions {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+    code {
+      background: #e9ecef;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+  </style>
+  <!-- Load FortuneOne Chat Widget -->
+  <link rel="stylesheet" href="./fortuneone-chat-widget.css">
+</head>
+<body>
+  <div class="demo-container">
+    <h1>FortuneOne AI Chat Widget Demo</h1>
+    <p>This is a demo page showing the FortuneOne AI chat widget in action.</p>
+    <p>Click the chat button in the bottom right corner to start chatting!</p>
+    
+    <div class="instructions">
+      <h3>How to use:</h3>
+      <ol>
+        <li>Make sure your backend is running at <code>http://localhost:4000</code></li>
+        <li>Click the purple chat button in the corner</li>
+        <li>Type a message or use voice input</li>
+        <li>The AI will respond with helpful information about Bangkok Fortune Thai Massage</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Initialize Widget -->
+  <script 
+    src="./fortuneone-chat-widget.js" 
+    data-backend-url="http://localhost:4000" 
+    data-business-id="bangkok-fortune" 
+    data-default-language="en">
+  </script>
+</body>
+</html>
