@@ -1,6 +1,7 @@
 /**
  * FortuneOne AI Chat Widget
  * Self-initializing chat widget with WebSocket, Speech Recognition & TTS
+ * Updated with debouncing and duplicate prevention
  */
 (function() {
   'use strict';
@@ -14,6 +15,23 @@
   let isOpen = false;
   let recognition = null;
   let isRecording = false;
+  let isSending = false; // Prevent duplicate sends
+  let reconnectAttempts = 0;
+  const MAX_RECONNECT_ATTEMPTS = 5;
+  const DEBOUNCE_DELAY = 300; // 300ms debounce
+
+  // Debounce function to prevent rapid-fire messages
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
 
   function init() {
     createWidget();
@@ -37,7 +55,7 @@
         <div class="fortuneone-chat-input-area">
           <input type="text" class="fortuneone-chat-input" placeholder="Type a message...">
           <button class="fortuneone-chat-voice" aria-label="Voice input">
-            <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1 1.93c-3.94-.49-7-3.85-7-7.93h2c0 3.31 2.69 6 6 6s6-2.69 6-6h2c0 4.08-3.06 7.44-7 7.93V20h4v2H8v-2h4v-4.07z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1 1.93c-3.94-.49-7-3.85-7-7.93h2c0 3.31 2.69 6 6 6s6-2.69 6-6h2c0 4.08-3.06 7.44-7 7.93v2h4v2H8v-2h4v-2z"/></svg>
           </button>
           <button class="fortuneone-chat-send" aria-label="Send">
             <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
@@ -67,32 +85,68 @@
       btn.style.display = 'flex';
     });
 
-    sendBtn.addEventListener('click', () => sendMessage(input));
+    // Debounced send function to prevent rapid-fire messages
+    const debouncedSend = debounce((inputEl) => {
+      sendMessage(inputEl);
+    }, DEBOUNCE_DELAY);
+
+    sendBtn.addEventListener('click', () => debouncedSend(input));
     input.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') sendMessage(input);
+      if (e.key === 'Enter') {
+        e.preventDefault(); // Prevent form submission
+        debouncedSend(input);
+      }
     });
 
     voiceBtn.addEventListener('click', toggleVoice);
   }
 
   function connectWebSocket() {
+    if (ws && ws.readyState === WebSocket.CONNECTING) {
+      console.log('[FortuneOne] WebSocket already connecting, skipping...');
+      return;
+    }
+    
     const wsUrl = BACKEND_URL.replace(/^http/, 'ws') + '/ws?business_id=' + BUSINESS_ID;
     ws = new WebSocket(wsUrl);
 
-    ws.onopen = () => { console.log('[FortuneOne] Connected'); };
+    ws.onopen = () => { 
+      console.log('[FortuneOne] Connected'); 
+      reconnectAttempts = 0; // Reset on successful connection
+    };
     ws.onmessage = (event) => handleMessage(JSON.parse(event.data));
-    ws.onclose = () => { setTimeout(connectWebSocket, 3000); };
+    ws.onclose = () => { 
+      // Exponential backoff for reconnection
+      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+        console.log(`[FortuneOne] Disconnected, reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1})`);
+        reconnectAttempts++;
+        setTimeout(connectWebSocket, delay);
+      } else {
+        console.error('[FortuneOne] Max reconnection attempts reached');
+      }
+    };
     ws.onerror = (err) => { console.error('[FortuneOne] Error:', err); };
   }
 
   function sendMessage(input) {
     const text = input.value.trim();
     if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
-
+    
+    // Prevent duplicate sends
+    if (isSending) {
+      console.log('[FortuneOne] Already sending, skipping duplicate...');
+      return;
+    }
+    
+    isSending = true;
     addMessage(text, 'user');
     ws.send(JSON.stringify({ type: 'text_input', content: text, language: DEFAULT_LANG }));
     input.value = '';
     showTyping();
+    
+    // Reset sending flag after a short delay
+    setTimeout(() => { isSending = false; }, 500);
   }
 
   function handleMessage(msg) {
@@ -119,8 +173,8 @@
       div.className = 'fortuneone-typing';
       div.innerHTML = '<div class="fortuneone-typing-dot"></div><div class="fortuneone-typing-dot"></div><div class="fortuneone-typing-dot"></div>';
       container.appendChild(div);
-      container.scrollTop = container.scrollHeight;
     }
+    container.scrollTop = container.scrollHeight;
   }
 
   function hideTyping() {
