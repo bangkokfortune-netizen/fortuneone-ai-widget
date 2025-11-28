@@ -22,6 +22,22 @@ fastify.get("/health", async () => {
   return { status: "ok", timestamp: new Date().toISOString() };
 });
 
+// Per-session message queue to ensure sequential processing
+const sessionQueues = new Map<string, Promise<void>>();
+
+// Process messages sequentially per session
+async function processMessageSequentially(
+  sessionId: string,
+  handler: () => Promise<void>
+): Promise<void> {
+  const currentQueue = sessionQueues.get(sessionId) || Promise.resolve();
+  const newQueue = currentQueue.then(handler).catch((err) => {
+    fastify.log.error(`[Session ${sessionId}] Message processing error:`, err);
+  });
+  sessionQueues.set(sessionId, newQueue);
+  return newQueue;
+}
+
 // WebSocket endpoint
 fastify.register(async function (fastify) {
   fastify.get("/ws", { websocket: true }, (socket, req) => {
@@ -55,37 +71,42 @@ fastify.register(async function (fastify) {
 
     // Handle incoming messages
     socket.on("message", async (rawData: Buffer) => {
-      try {
-        const message: WebSocketInboundMessage = JSON.parse(rawData.toString());
-        fastify.log.info(`Received message: ${JSON.stringify(message)}`);
+      // Queue message for sequential processing
+      await processMessageSequentially(sessionId, async () => {
+        try {
+          const message: WebSocketInboundMessage = JSON.parse(rawData.toString());
+          fastify.log.info(`[Session ${sessionId}] Received message: ${JSON.stringify(message)}`);
 
-        if (message.type === "text_input") {
-          // Create full ClientTextInputMessage object with all required fields
-          const clientMsg: ClientTextInputMessage = {
-            type: "text_input",
-            business_id: businessId,
-            session_id: sessionId,
-            content: message.content,
-            language: message.language || "en",
+          if (message.type === "text_input") {
+            // Create full ClientTextInputMessage object with all required fields
+            const clientMsg: ClientTextInputMessage = {
+              type: "text_input",
+              business_id: businessId,
+              session_id: sessionId,
+              content: message.content,
+              language: message.language || "en",
+            };
+            const response = await handleClientTextMessage(clientMsg, businessConfig);
+            socket.send(JSON.stringify(response));
+          }
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : "Unknown error";
+          fastify.log.error(`[Session ${sessionId}] Error processing message: ${errorMessage}`);
+          const errorResponse: WebSocketOutboundMessage = {
+            type: "text_output",
+            content: "Sorry, I encountered an error processing your message.",
+            language: "en",
+            error: "PROCESSING_ERROR",
           };
-          const response = await handleClientTextMessage(clientMsg, businessConfig);
-          socket.send(JSON.stringify(response));
+          socket.send(JSON.stringify(errorResponse));
         }
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        fastify.log.error(`Error processing message: ${errorMessage}`);
-        const errorResponse: WebSocketOutboundMessage = {
-          type: "text_output",
-          content: "Sorry, I encountered an error processing your message.",
-          language: "en",
-          error: "PROCESSING_ERROR",
-        };
-        socket.send(JSON.stringify(errorResponse));
-      }
+      });
     });
 
     socket.on("close", () => {
       fastify.log.info(`WebSocket disconnected: sessionId=${sessionId}`);
+      // Clean up session queue
+      sessionQueues.delete(sessionId);
     });
   });
 });
