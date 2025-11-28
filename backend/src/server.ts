@@ -60,11 +60,13 @@ fastify.register(async function (fastify) {
         fastify.log.info(`Received message: ${JSON.stringify(message)}`);
 
         if (message.type === "text_input") {
-          const response = await handleClientTextMessage(
-            message.content,
-            businessConfig,
-            message.language || "en"
-          );
+          // Create ClientTextInputMessage object
+          const clientMsg = {
+            type: "text_input" as const,
+            content: message.content,
+            language: message.language || "en",
+          };
+          const response = await handleClientTextMessage(clientMsg, businessConfig);
           socket.send(JSON.stringify(response));
         }
       } catch (error: unknown) {
